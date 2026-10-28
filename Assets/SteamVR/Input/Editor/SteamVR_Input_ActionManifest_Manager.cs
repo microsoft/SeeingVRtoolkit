@@ -227,10 +227,31 @@ namespace Valve.VR
             Debug.Log("<b>[SteamVR]</b> Added action bindings to: " + currentBindingPath);
         }
 
+        // binding_url comes from an imported actions.json and is used as a file copy destination,
+        // so only allow a bare .json file name (no directories, traversal, or rooted paths).
+        protected static bool IsSafeBindingFileName(string bindingUrl)
+        {
+            if (string.IsNullOrEmpty(bindingUrl))
+                return false;
+            if (bindingUrl.IndexOf('/') >= 0 || bindingUrl.IndexOf('\\') >= 0)
+                return false;
+            if (bindingUrl.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+                return false;
+            if (Path.IsPathRooted(bindingUrl) || bindingUrl != Path.GetFileName(bindingUrl))
+                return false;
+            return bindingUrl.EndsWith(".json", StringComparison.OrdinalIgnoreCase);
+        }
+
         protected static void ImportBindings(SteamVR_Input_ActionFile currentActionsFile, SteamVR_Input_ActionFile newActionsFile, string directory)
         {
             foreach (var newDefaultPath in newActionsFile.default_bindings)
             {
+                if (IsSafeBindingFileName(newDefaultPath.binding_url) == false)
+                {
+                    Debug.LogError("<b>[SteamVR]</b> Skipping binding with unsafe binding_url: " + newDefaultPath.binding_url);
+                    continue;
+                }
+
                 if (currentActionsFile.default_bindings.Any(currentDefaultPath => newDefaultPath.controller_type == currentDefaultPath.controller_type) == false)
                 {
                     currentActionsFile.default_bindings.Add(newDefaultPath.GetCopy());
@@ -532,6 +553,12 @@ namespace Valve.VR
 
             foreach (var newDefaultPath in newActionsFile.default_bindings)
             {
+                if (IsSafeBindingFileName(newDefaultPath.binding_url) == false)
+                {
+                    Debug.LogError("<b>[SteamVR]</b> Skipping binding with unsafe binding_url: " + newDefaultPath.binding_url);
+                    continue;
+                }
+
                 string bindingPath = Path.Combine(partialBindingDirectory, newDefaultPath.binding_url);
                 File.Copy(bindingPath, newDefaultPath.binding_url);
             }
